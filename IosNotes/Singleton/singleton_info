@@ -1,0 +1,12 @@
+There are 2 types of singletons
+
+-Shared Singleton
+    -Has a shared method that makes it convenient to access the same instance
+    
+    
+-Strict Singleton
+    -Restricts more than one instance from being created (even with alloc init)
+    
+
+**Usually use a shared singleton. Only use strict if more than one instance would create problems.
+**Scope doesn't matter with these -- You can let your singleton leave scope and it will still be in memory

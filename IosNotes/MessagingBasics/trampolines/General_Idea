@@ -1,0 +1,15 @@
+-A message is sent to a trampoline that it doesn't respond to.
+
+-An NSIncovation is created to be sent to forwardInvocation
+    -First, methodSignatureForSelector is called on the trampoline
+    -Only if it returns a signature will forwardInvocation be called
+
+-forwardInvocation is called which you use to do whatever intermediate work + forward the message to the object that responds to the original message.
+
+
+
+**Times to use
+
+-When you need a manager that provides notifications to multiple objects
+-For undo features
+-When you need to perform intermediate work before an object performs its task (caching, moving messages to main thread). You don't have to change the implementation of your message. Just forward the message to your trampoline and have it do the work.
