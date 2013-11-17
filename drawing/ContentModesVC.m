@@ -8,6 +8,7 @@
 
 #import "ContentModesVC.h"
 #import "CustomView.h"
+#import "UIKitDrawingDemo.h"
 
 #define CUSTOM_VIEW_TAG 1000
 
@@ -44,6 +45,18 @@
     [self.view addSubview:customView];
     customView.backgroundColor = [UIColor lightGrayColor];
     
+    
+    UIKitDrawingDemo * uiKitView = [[UIKitDrawingDemo alloc] initWithFrame:(CGRect){self.view.frame.size.width/2, toolbar.frame.size.height,
+        (CGSize){self.view.frame.size.width/2., self.view.frame.size.height/2.}}];
+    UILabel *uiKitLabel = [[UILabel alloc] init];
+    uiKitLabel.text = @"Drawing with UIKit";
+    uiKitLabel.font = [UIFont systemFontOfSize:12];
+    [uiKitLabel sizeToFit];
+    uiKitLabel.center = (CGPoint){uiKitView.bounds.size.width/2, uiKitLabel.bounds.size.height/2};
+    [uiKitView addSubview:uiKitLabel];
+    uiKitView.backgroundColor = [UIColor whiteColor];
+    
+    [self.view addSubview:uiKitView];
 }
 
 -(void)increaseViewSize{

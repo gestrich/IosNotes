@@ -8,12 +8,17 @@
 
 #import "CustomView.h"
 
-@interface CustomView(){
-}
+const CGFloat kXScale = 5.0;
+const CGFloat kYScale = 100.0;
 
+@interface CustomView()
+@property NSMutableArray *values;
 @end
 
-@implementation CustomView
+
+@implementation CustomView{
+    dispatch_source_t _timer;
+}
 
 
 
@@ -30,7 +35,17 @@
     
     //Will cause layoutSubview to be called after 5 seconds
     //[self performSelector:@selector(setNeedsLayout) withObject:self afterDelay:10.0];
+
+    //Used by drawGraph
+    //Creates timer to call updateValues
+    //which will update array of values to draw
+    
+    [self setupTimer];
     return self;
+}
+
+-(void)dealloc{
+    dispatch_source_cancel(_timer);
 }
 
 
@@ -56,10 +71,11 @@
    
     
     //[self drawRectangle];
-   // [self drawBezierCurve];
-    [self drawBezierCurveWithAffineMatrix];
+    //[self drawBezierCurve];
+    //[self drawBezierCurveWithAffineMatrix];
     //[self drawLine:UIGraphicsGetCurrentContext()];
     //[self pixelAlignment:UIGraphicsGetCurrentContext()];
+   // [self drawGraph];
 }
 
 
@@ -120,84 +136,6 @@
     UIRectFill((CGRect){10,10,10,100}); //notice not even obj-c code -- but is UIKit
 }
 
-/* Draw a flower
-    using a bezier path.
- Bezier paths are a UIKit drawing mechanism that can draw
- arcs, lines, rectangles & ovals
-*/
--(void)drawBezierCurve{
-    CGSize size = self.bounds.size;
-    CGFloat margin = 10; //margins are 5,5,5,5
-    
-    //Radius of each arc will be 1/4 of height or width, whichever is smaller
-    //rint is for rounding to nearest integer
-    CGFloat radius = rint(MIN(size.height - margin,
-                              size.width - margin) / 4);
-   
-    
-    //This section calculates where to begin the flower (upper left corner of flower)
-    CGFloat xOffset, yOffset;
-        //If view is perfect square, offset will be 0
-        //If view is wider than tall, offset will be negative
-        //If view is taller than wide, offset will be positive
-    CGFloat offset = rint((size.height - size.width) / 2);
-    if (offset > 0) {
-        //View taller than wide
-        xOffset = rint(margin / 2); // x offset will be all the way to left
-        yOffset = offset; // y offset will be extra height divided by 2 (so centered)
-    }else {
-        //View wider than tall -- same logic as above -- only reversed
-        xOffset = -offset;
-        yOffset = rintf(margin / 2);
-    }
-
-    //Set the fill/stroke for drawing -- seems to always be case when drawing
-    [[UIColor redColor] setFill];
-    [[UIColor greenColor] setStroke];
-    
-    //Create the Bezier path -- just mathematical coordinates for drawing
-    UIBezierPath *path = [UIBezierPath bezierPath];
-
-    //Top circle
-
-    [path addArcWithCenter:CGPointMake(radius *2 + xOffset,
-                                       radius + yOffset)
-                    radius:radius
-                startAngle:-M_PI
-                  endAngle:0
-                 clockwise:YES];
-
-    //Right circle
-    [path addArcWithCenter:CGPointMake(radius *3 + xOffset,
-                                       radius *2 + yOffset)
-                    radius:radius
-                startAngle:-M_PI_2
-                  endAngle:M_PI_2
-                 clockwise:YES];
-
-    //Bottom circle
-    [path addArcWithCenter:CGPointMake(radius *2 + xOffset,
-                                       radius *3 + yOffset)
-                    radius:radius
-                startAngle:0
-                  endAngle:M_PI
-                 clockwise:YES];
-
-    //Left circle
-    [path addArcWithCenter:CGPointMake(radius + xOffset,
-                                       radius * 2 + yOffset)
-                    radius:radius
-                startAngle:M_PI_2
-                  endAngle:-M_PI_2
-                 clockwise:YES];
-
-    [path closePath];
-
-    //Nothing is drawn until you call fill and/or stroke on the Bezier path
-    [path stroke];
-    [path fill];
-
-}
 
 /*Convenient function for performing scaling and translation using Core Graphics
  sx = x scale factor
@@ -243,4 +181,94 @@ static inline CGAffineTransform CGAffineTransformMakeScaleTranslate(CGFloat sx, 
     [path applyTransform:transform];
     [path fill];
 }
+
+/*
+ * Timer used to animate graph
+ */
+-(void)setupTimer{
+    _values = [NSMutableArray array];
+    
+    __weak id weakSelf = self;
+    double delayInSeconds = 0.25;
+    //Monitor low-level events -- in this case timer
+    _timer =
+    dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0,
+                           dispatch_get_main_queue());
+    dispatch_source_set_timer(
+                              _timer, dispatch_walltime(NULL, 0),
+                              (unsigned)(delayInSeconds * NSEC_PER_SEC), 0);
+    dispatch_source_set_event_handler(_timer, ^{
+        [weakSelf updateValues];
+    });
+    //Resume the invocation of block objects on a dispatch object
+    dispatch_resume(_timer);
+    
+    
+    
+}
+
+
+/*Used by draw graph
+ *create array of values
+ * to draw
+ */
+- (void)updateValues {
+    double nextValue = sin(CFAbsoluteTimeGetCurrent())
+    + ((double)rand()/(double)RAND_MAX);
+    [self.values addObject:
+     [NSNumber numberWithDouble:nextValue]];
+    CGSize size = self.bounds.size;
+    CGFloat maxDimension = MAX(size.height, size.width);
+    NSUInteger maxValues =
+    (NSUInteger)floorl(maxDimension / kXScale);
+    
+    if ([self.values count] > maxValues) {
+        [self.values removeObjectsInRange:
+         NSMakeRange(0, [self.values count] - maxValues)];
+    }
+   
+    //Notify drawing needs done
+    [self setNeedsDisplay];
+}
+
+-(void)drawGraph{
+    
+    if ([self.values count] == 0) {
+        return;
+    }
+    
+    CGContextRef ctx = UIGraphicsGetCurrentContext();
+    CGContextSetStrokeColorWithColor(ctx,
+                                     [[UIColor redColor] CGColor]);
+    
+    //Set style for connected lines in graphics context
+    CGContextSetLineJoin(ctx, kCGLineJoinRound);
+    CGContextSetLineWidth(ctx, 5);
+   
+    //Start the new path
+    //Mutable path required to be used with
+    // CGPathAddLineToPoint
+    CGMutablePathRef path = CGPathCreateMutable();
+    
+    CGFloat yOffset = self.bounds.size.height / 2;
+    CGAffineTransform transform =
+    CGAffineTransformMakeScaleTranslate(kXScale, kYScale,
+                                        0, yOffset);
+    
+    CGFloat y = [[self.values objectAtIndex:0] floatValue];
+    CGPathMoveToPoint(path, &transform, 0, y);
+
+    //Gets the y for each x and adds
+    //to path of points to draw
+    for (NSUInteger x = 1; x < [self.values count]; ++x) {
+        y = [[self.values objectAtIndex:x] floatValue];
+        CGPathAddLineToPoint(path, &transform, x, y);
+    }
+    
+    CGContextAddPath(ctx, path);
+    CGPathRelease(path);
+    CGContextStrokePath(ctx); 
+    
+}
+
 @end
